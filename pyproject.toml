@@ -40,12 +40,15 @@ packages = ["src/ocd"]
 
 [dependency-groups]
 dev = [
-    "ruff>=0.15",
+    "build>=1.0",
+    "mdformat>=1.0.0",
+    "mdformat-gfm>=1.0.0",
     "mypy>=1.10",
     "pytest>=8.0",
-    "pytest-cov>=5.0",
     "pytest-asyncio>=0.24",
-    "build>=1.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.15",
+    "yamllint>=1.0",
 ]
 
 [tool.ruff]
