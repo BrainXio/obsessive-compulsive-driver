@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import shutil
 import subprocess
 import sys
@@ -12,12 +13,14 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from ocd.modes import ALLOWED_MODES
 from ocd.standards_data import (
     check_message,
     compute_standards_hash,
     get_standards_reference,
     verify_standards_hash,
 )
+from ocd.tools.standards_checker import _CHECKER_NAMES, StandardsChecker
 
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 
@@ -32,7 +35,6 @@ mcp = FastMCP(
 # ── Mode state ────────────────────────────────────────────────────────────────
 
 _current_mode: str = "developer"
-_ALLOWED_MODES: frozenset[str] = frozenset({"developer"})
 
 
 def _find_project_root() -> Path:
@@ -42,6 +44,13 @@ def _find_project_root() -> Path:
         if (parent / ".git").exists():
             return parent
     return cwd
+
+
+def _rel(root: Path, path: Path) -> str:
+    try:
+        return str(path.relative_to(root))
+    except ValueError:
+        return str(path)
 
 
 def _tool_available(binary: str) -> bool:
@@ -76,10 +85,10 @@ async def ocd_set_mode(mode: str) -> str:
     """Switch the active rule/gate/skill set.
 
     Args:
-        mode: The mode to activate. Phase 1 only accepts "developer".
+        mode: The mode to activate. Available: developer, research, review, ops, personal.
     """
-    if mode not in _ALLOWED_MODES:
-        allowed = ", ".join(sorted(_ALLOWED_MODES))
+    if mode not in ALLOWED_MODES:
+        allowed = ", ".join(sorted(ALLOWED_MODES))
         return json.dumps({"ok": False, "error": f"Unknown mode '{mode}'. Allowed: {allowed}"})
     global _current_mode
     _current_mode = mode
@@ -563,6 +572,144 @@ async def ocd_standards_update() -> str:
             "detail": f"standards reference: {ref}",
             "computed_hash": computed,
         }
+    )
+
+
+@mcp.tool()
+async def ocd_standard_check(name: str) -> str:
+    """Run a single named standard check.
+
+    Args:
+        name: Standard name key (e.g., 'no-dead-code', 'single-source-of-truth', etc.)
+    """
+    root = _find_project_root()
+    checker = StandardsChecker(root)
+    result = checker.run_one(name)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+async def ocd_standard_check_all() -> str:
+    """Run all Nine Standards checks and return aggregated results."""
+    root = _find_project_root()
+    checker = StandardsChecker(root)
+    result = checker.run_all()
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+async def ocd_standard_list() -> str:
+    """List available standard check names."""
+    return json.dumps({"standards": sorted(_CHECKER_NAMES)}, indent=2)
+
+
+@mcp.tool()
+async def ocd_validate_mcp_conventions() -> str:
+    """Validate MCP tool naming conventions across the ecosystem.
+
+    Checks that tool names follow the prefix pattern (adhd_*, ocd_*, asd_*)
+    and flags tools without proper namespace prefixes.
+    """
+    root = _find_project_root()
+    evidence: list[str] = []
+    py_files = [
+        p for p in root.rglob("*.py") if ".venv" not in str(p) and "__pycache__" not in str(p)
+    ]
+
+    valid_prefixes = ("adhd_", "ocd_", "asd_")
+    tool_decorator_pattern = re.compile(r"@mcp\.tool\(\)")
+
+    for fpath in py_files:
+        content = None
+        try:
+            content = fpath.read_text()
+        except (OSError, UnicodeDecodeError):
+            continue
+
+        if not tool_decorator_pattern.search(content):
+            continue
+
+        # Find all tool function definitions
+        for m in re.finditer(r"async def (\w+)\(.*\)", content):
+            name = m.group(1)
+            if not name.startswith(valid_prefixes):
+                rel = _rel(root, fpath)
+                evidence.append(
+                    f"{rel}:{content[: m.start()].count(chr(10)) + 1}: "
+                    f"'{name}' lacks required prefix ({', '.join(valid_prefixes)})"
+                )
+
+    status = "fail" if evidence else "pass"
+    return json.dumps(
+        {
+            "check": "mcp-naming-conventions",
+            "status": status,
+            "evidence": evidence[:20],
+        },
+        indent=2,
+    )
+
+
+@mcp.tool()
+async def ocd_validate_ppac_consistency() -> str:
+    """Validate PPAC loop consistency across the codebase.
+
+    Checks that Proposer, Predictor, Actor, Critic patterns are present
+    and that decision loops follow the required sequence.
+    """
+    root = _find_project_root()
+    evidence: list[str] = []
+
+    ppac_phases = {
+        "proposer": ["propose", "option", "candidate", "plan"],
+        "predictor": ["predict", "limbic", "emotional", "amygdala", "hippocampal"],
+        "accumulator": ["accumulate", "parietal", "evidence", "threshold"],
+        "actor": ["select", "basal_ganglia", "go_pathway", "nogo_pathway", "action"],
+        "critic": ["dopamine", "rpe", "reward_prediction", "outcome", "update"],
+    }
+
+    py_files = [
+        p for p in root.rglob("*.py") if ".venv" not in str(p) and "__pycache__" not in str(p)
+    ]
+
+    for fpath in py_files:
+        try:
+            source = fpath.read_text()
+        except (OSError, UnicodeDecodeError):
+            continue
+
+        found_phases: set[str] = set()
+        source_lower = source.lower()
+
+        for phase, keywords in ppac_phases.items():
+            for kw in keywords:
+                if kw in source_lower:
+                    found_phases.add(phase)
+                    break
+
+        # Flag files that have proposer but no critic (incomplete loop)
+        if "proposer" in found_phases and "critic" not in found_phases:
+            rel = _rel(root, fpath)
+            evidence.append(
+                f"{rel}: has Proposer patterns but no Critic/RPE — PPAC loop may be incomplete"
+            )
+
+        # Check for action without prior accumulation
+        if "actor" in found_phases and "accumulator" not in found_phases:
+            rel = _rel(root, fpath)
+            evidence.append(
+                f"{rel}: has Actor/Action patterns but no Accumulator — "
+                f"decision may lack evidence gathering"
+            )
+
+    status = "warn" if evidence else "pass"
+    return json.dumps(
+        {
+            "check": "ppac-consistency",
+            "status": status,
+            "evidence": evidence[:20],
+        },
+        indent=2,
     )
 
 

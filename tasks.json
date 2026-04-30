@@ -1,0 +1,351 @@
+{
+  "meta": {
+    "repository": "obsessive-compulsive-driver",
+    "package": "ocd",
+    "role": "Discipline and enforcement layer — rules, gates, modes",
+    "last_updated": "2026-04-30",
+    "schema_version": "2.0",
+    "schema": "task-enforcer-v1",
+    "description": "Transitional task list — will be replaced by MCP-based task-enforcer server when mature",
+    "framework_reference": "Eisenhower matrix (urgent/important), P1-P4 numerical scaling, RPE-weighted value scoring, PPAC decision gating, Kanban status flow"
+  },
+  "completed": [
+    "MCP server with discipline tools (check, ci_check, get_mode, set_mode, lint_work, run_formatters, scan_secrets, standards_update, standards_verify, verify_commit)",
+    "Nine Standards data module with hash verification",
+    "Developer mode with baseline CI checks",
+    "Pre-commit hook concept documented",
+    ".mcp.json aligned across all 5 repos",
+    "Repo renamed from BrainXio/OCD → BrainXio/obsessive-compulsive-driver",
+    "Enhanced tasks.json v2.0 with priority, decision elements, testability, and Kanban status flow"
+  ],
+  "pending": [
+    {
+      "id": "ocd-1",
+      "priority": {
+        "level": 1,
+        "eisenhower": "urgent-important",
+        "rpe_weight": 0.95,
+        "value_score": 90
+      },
+      "decisions": {
+        "gonogo": { "type": "auto", "gating": "ppac-critic" },
+        "ppac_critic": true,
+        "human_claim": false,
+        "hitl_required": false
+      },
+      "kanban_status": "ready",
+      "subject": "Expand Nine Standards into automated MCP checks",
+      "description": "Each Standard should have a corresponding MCP tool or check function that can be run on demand or wired into CI. Standards: Consistent Defaults, Defense in Depth, Deterministic Ordering, No Dead Code, Single Source of Truth, Structural Honesty, etc.",
+      "files": ["src/ocd/standards_data.py", "src/ocd/mcp_server.py", "src/ocd/tools/"],
+      "references": [".archive/obsessive-compulsive-driver/OCD-NEW.md (bootstrap spec)", ".archive/ocd-old-reference/ (canonical historical source for Nine Standards, rules, gates, hooks, content pipelines, and enforcement configs: gitleaks.toml, semgrep.yml, trivy.yaml, hadolint.yaml, yamllint, mdformat.toml, etc.)"],
+      "acceptance": [
+        "Each standard has a callable checker",
+        "MCP exposes ocd_standard_check(name) or per-standard tools",
+        "Results posted in structured format (pass/fail + evidence)"
+      ],
+      "definition_of_done": [
+        "All acceptance criteria verified",
+        "RPE telemetry recorded on completion via ai rpe record --task ocd-1",
+        "Nine Standards check passes on all changed files",
+        "All ruff and mypy checks pass"
+      ],
+      "rpe_hook": "ai rpe record --outcome 1.0 --task ocd-1 --context 'expand-nine-standards'",
+      "dependencies": [],
+      "blocks": ["ocd-4"]
+    },
+    {
+      "id": "ocd-2",
+      "priority": {
+        "level": 2,
+        "eisenhower": "urgent-important",
+        "rpe_weight": 0.8,
+        "value_score": 78
+      },
+      "decisions": {
+        "gonogo": { "type": "auto", "gating": "none" },
+        "ppac_critic": false,
+        "human_claim": false,
+        "hitl_required": false
+      },
+      "kanban_status": "backlog",
+      "subject": "Add MCP-pattern and PPAC-consistency validators",
+      "description": "Custom lint rules for MCP tool naming conventions (adhd_*, ocd_*, asd_*) and PPAC loop consistency checks (e.g., every Proposer must have a matching Critic update).",
+      "files": ["src/ocd/mcp_server.py", "src/ocd/standards_data.py"],
+      "acceptance": [
+        "Validator detects MCP tool naming violations",
+        "Validator warns on PPAC loop without outcome recording",
+        "Results usable in CI pipeline"
+      ],
+      "definition_of_done": [
+        "All acceptance criteria verified",
+        "Nine Standards check passes on changed files",
+        "Existing tests still pass at 100%"
+      ],
+      "rpe_hook": "ai rpe record --outcome 1.0 --task ocd-2 --context 'mcp-ppac-validators'",
+      "dependencies": [],
+      "blocks": []
+    },
+    {
+      "id": "ocd-3",
+      "priority": {
+        "level": 2,
+        "eisenhower": "important-not-urgent",
+        "rpe_weight": 0.7,
+        "value_score": 72
+      },
+      "decisions": {
+        "gonogo": { "type": "auto", "gating": "none" },
+        "ppac_critic": false,
+        "human_claim": false,
+        "hitl_required": false
+      },
+      "kanban_status": "backlog",
+      "subject": "Implement additional modes (research, review, ops, personal)",
+      "description": "Each mode changes which standards are enforced and how strictly. Research mode might relax No Dead Code; Review mode might enforce stricter Structural Honesty; Ops mode emphasizes Defense in Depth; Personal mode is user-configurable.",
+      "files": ["src/ocd/modes/", "src/ocd/mcp_server.py", "docs/architecture.md"],
+      "acceptance": [
+        "At least 2 new modes implemented with distinct rule sets",
+        "Mode switch via ocd_set_mode persists and affects checks",
+        "Documented in architecture"
+      ],
+      "definition_of_done": [
+        "All acceptance criteria verified",
+        "Mode switch is persistent across MCP reconnects",
+        "Documentation updated with mode descriptions"
+      ],
+      "rpe_hook": "ai rpe record --outcome 1.0 --task ocd-3 --context 'additional-modes'",
+      "dependencies": [],
+      "blocks": []
+    },
+    {
+      "id": "ocd-4",
+      "priority": {
+        "level": 3,
+        "eisenhower": "important-not-urgent",
+        "rpe_weight": 0.6,
+        "value_score": 60
+      },
+      "decisions": {
+        "gonogo": { "type": "auto", "gating": "dependency" },
+        "ppac_critic": false,
+        "human_claim": false,
+        "hitl_required": false
+      },
+      "kanban_status": "blocked",
+      "subject": "Create pre-commit hook integration",
+      "description": "Provide a script that agents can install as a git pre-commit hook. It runs ocd_check and blocks commits that violate the current mode's standards.",
+      "files": ["scripts/pre-commit-ocd.sh", "README.md"],
+      "acceptance": [
+        "Hook script runs ocd_check via MCP or direct call",
+        "Fails commit on critical violations",
+        "Optional per-repo install instructions"
+      ],
+      "definition_of_done": [
+        "All acceptance criteria verified",
+        "Hook tested against a known-violating commit",
+        "Install instructions documented in README"
+      ],
+      "rpe_hook": "ai rpe record --outcome 1.0 --task ocd-4 --context 'precommit-hook'",
+      "dependencies": ["ocd-1"],
+      "blocks": []
+    },
+    {
+      "id": "ocd-5",
+      "priority": {
+        "level": 3,
+        "eisenhower": "important-not-urgent",
+        "rpe_weight": 0.5,
+        "value_score": 55
+      },
+      "decisions": {
+        "gonogo": { "type": "auto", "gating": "none" },
+        "ppac_critic": false,
+        "human_claim": false,
+        "hitl_required": false
+      },
+      "kanban_status": "backlog",
+      "subject": "Document Nine Standards with examples",
+      "description": "Write clear documentation for each standard with concrete before/after code examples. This helps agents understand and apply the rules correctly.",
+      "files": ["docs/standards.md", "README.md"],
+      "acceptance": [
+        "Each standard has a dedicated section with examples",
+        "Examples cover Python, Markdown, and JSON config",
+        "Linked from README"
+      ],
+      "definition_of_done": [
+        "All acceptance criteria verified",
+        "mdformat --check passes on all docs",
+        "Examples are runnable or verified correct"
+      ],
+      "rpe_hook": "ai rpe record --outcome 1.0 --task ocd-5 --context 'standards-docs'",
+      "dependencies": [],
+      "blocks": ["ocd-7"]
+    },
+    {
+      "id": "ocd-6",
+      "priority": {
+        "level": 1,
+        "eisenhower": "urgent-important",
+        "rpe_weight": 0.9,
+        "value_score": 88
+      },
+      "decisions": {
+        "gonogo": { "type": "human-claim", "gating": "hitl-approval" },
+        "ppac_critic": true,
+        "human_claim": true,
+        "hitl_required": true
+      },
+      "kanban_status": "ready",
+      "subject": "Expose OCD rules/skills via MCP for self-describing usage",
+      "description": "Follow the uniform `{package}_get_rules` pattern. Any agent can query `ocd_get_rules` to learn the Nine Standards, mode definitions, enforcement pipeline, and env var reference at runtime. **Cross-package pattern:** Coordinate with ADHD (adhd-7) and ASD (asd-6) to implement a unified pattern — implement once, replicate.",
+      "files": ["src/ocd/mcp_server.py", "src/ocd/rules.py"],
+      "acceptance": [
+        "New MCP tool ocd_get_rules returns structured protocol rules",
+        "Rules include: Nine Standards definitions, mode rule sets, hook pipeline, env var reference",
+        "Rules are versioned and match the current enforcement model"
+      ],
+      "definition_of_done": [
+        "All acceptance criteria verified",
+        "ocd_get_rules returns valid JSON matching ADHD's get_rules schema",
+        "Cross-repo pattern verified: ADHD, ASD, OCD all have get_rules",
+        "Human has approved the implementation via HITL"
+      ],
+      "rpe_hook": "ai rpe record --outcome 1.0 --task ocd-6 --context 'get-rules-mcp'",
+      "dependencies": [],
+      "cross_references": ["adhd-7", "asd-6"]
+    },
+    {
+      "id": "ocd-7",
+      "priority": {
+        "level": 2,
+        "eisenhower": "important-not-urgent",
+        "rpe_weight": 0.65,
+        "value_score": 65
+      },
+      "decisions": {
+        "gonogo": { "type": "auto", "gating": "dependency" },
+        "ppac_critic": false,
+        "human_claim": false,
+        "hitl_required": false
+      },
+      "kanban_status": "blocked",
+      "subject": "Align README MCP tool table and add Nine Standards links",
+      "description": "Update README.md to reflect all current MCP tools including ocd_get_rules. Add dedicated Nine Standards section with links to documentation. Ensure tool descriptions match the 'OCD Parallel' framing style.",
+      "files": ["README.md", "docs/standards.md"],
+      "acceptance": [
+        "MCP tool table includes ocd_get_rules with parallel description",
+        "Nine Standards section added with dedicated subsections",
+        "All 10+ tools documented with consistent 'OCD Parallel' framing"
+      ],
+      "definition_of_done": [
+        "All acceptance criteria verified",
+        "README renders correctly on GitHub",
+        "No broken links or missing sections"
+      ],
+      "rpe_hook": "ai rpe record --outcome 1.0 --task ocd-7 --context 'readme-alignment'",
+      "dependencies": ["ocd-6", "ocd-5"],
+      "blocks": []
+    },
+    {
+      "id": "ocd-8",
+      "priority": {
+        "level": 1,
+        "eisenhower": "urgent-important",
+        "rpe_weight": 0.85,
+        "value_score": 82
+      },
+      "decisions": {
+        "gonogo": { "type": "auto", "gating": "none" },
+        "ppac_critic": false,
+        "human_claim": false,
+        "hitl_required": false
+      },
+      "kanban_status": "ready",
+      "subject": "Fix E501 line-too-long errors in mode_definitions.py",
+      "description": "4 ruff E501 errors in src/ocd/modes/mode_definitions.py: long description strings for research, review, ops, and personal modes exceed the 100-char limit. Break lines or shorten descriptions.",
+      "files": ["src/ocd/modes/mode_definitions.py"],
+      "acceptance": [
+        "Zero E501 errors in mode_definitions.py",
+        "ruff check . passes with zero errors",
+        "Descriptions remain human-readable and clear"
+      ],
+      "definition_of_done": [
+        "All acceptance criteria verified",
+        "Zero ruff errors across entire repo",
+        "No regressions in existing tests"
+      ],
+      "rpe_hook": "ai rpe record --outcome 1.0 --task ocd-8 --context 'fix-e501-errors'",
+      "dependencies": [],
+      "blocks": []
+    },
+    {
+      "id": "ocd-9",
+      "priority": {
+        "level": 1,
+        "eisenhower": "urgent-important",
+        "rpe_weight": 0.92,
+        "value_score": 88
+      },
+      "decisions": {
+        "gonogo": { "type": "human-claim", "gating": "hitl-approval" },
+        "ppac_critic": true,
+        "human_claim": true,
+        "hitl_required": true
+      },
+      "kanban_status": "backlog",
+      "subject": "Bootstrap task-enforcer MCP server preparation",
+      "description": "Design and implement the transitional task-enforcer schema that will eventually become the full MCP-based task-enforcer server. This tasks.json v2.0 schema is the prototype. Create the data model, validation logic, and MCP tool stubs that can read/write tasks with full priority, decision, and RPE fields. Use the enhanced schema defined in this file as the contract.",
+      "files": ["src/ocd/task_enforcer/", "src/ocd/mcp_server.py"],
+      "acceptance": [
+        "Schema matches tasks.json v2.0 structure exactly",
+        "Validation logic rejects malformed task entries",
+        "MCP tool stubs: ocd_task_list, ocd_task_get, ocd_task_update exist",
+        "RPE hook field is machine-readable and executable"
+      ],
+      "definition_of_done": [
+        "All acceptance criteria verified",
+        "Schema validates against all existing tasks",
+        "MCP tools are registered and respond to queries",
+        "Human has approved the enforcer design via HITL",
+        "RPE telemetry link established: task completion triggers RPE record"
+      ],
+      "rpe_hook": "ai rpe record --outcome 1.0 --task ocd-9 --context 'task-enforcer-bootstrap'",
+      "dependencies": ["ocd-8"],
+      "cross_references": ["root-10"]
+    },
+    {
+      "id": "ocd-10",
+      "priority": {
+        "level": 2,
+        "eisenhower": "important-not-urgent",
+        "rpe_weight": 0.75,
+        "value_score": 72
+      },
+      "decisions": {
+        "gonogo": { "type": "auto", "gating": "ppac-critic" },
+        "ppac_critic": true,
+        "human_claim": false,
+        "hitl_required": false
+      },
+      "kanban_status": "backlog",
+      "subject": "Integrate RPE telemetry for task completion signals",
+      "description": "Establish the RPE feedback loop between task completion and the Another-Intelligence dopamine/Critic system. Every task that reaches 'done' should generate a preference-pair training signal. Link to the existing ai rpe record command and ensure the ADHD bus carries completion events that the AI's Critic can consume.",
+      "files": ["src/ocd/task_enforcer/rpe_bridge.py", "src/ocd/mcp_server.py"],
+      "acceptance": [
+        "Task completion publishes RPE event to ADHD bus",
+        "Event includes: task_id, outcome value, context, timestamp",
+        "AI Critic can discover and consume RPE events from bus",
+        "Format compatible with preference-pair dataset generation"
+      ],
+      "definition_of_done": [
+        "All acceptance criteria verified",
+        "Test RPE event published and consumed end-to-end",
+        "Schema matches ai-4 preference-pair format",
+        "Nine Standards check passes on all new code"
+      ],
+      "rpe_hook": "ai rpe record --outcome 1.0 --task ocd-10 --context 'rpe-telemetry-integration'",
+      "dependencies": ["ocd-9", "ai-1"],
+      "cross_references": ["ai-4", "ai-6"]
+    }
+  ]
+}

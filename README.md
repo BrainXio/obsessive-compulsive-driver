@@ -48,12 +48,15 @@ and no hard dependency on any other BrainXio package.
 
 OCD operates in modes. Each mode activates a specific bundle of rules, skills, and gates:
 
-- **developer** (Phase 1 MVP) — standard development gates: branch protection, standards
-  verification, secret scanning, linting, formatting
-- **research** (future) — exploratory work gates: looser formatting, no commit enforcement
-- **review** (future) — PR review gates: diff-aware checks, standards drift detection
-- **ops** (future) — operational gates: deployment safety, config validation
-- **personal** (future) — personal project gates: minimal enforcement, configurable rules
+- **developer** — standard development gates: branch protection, standards verification,
+  secret scanning, linting, formatting. All checks at `strict` or `warn` level.
+- **research** — exploratory work gates: dead code and surface area checks skip. Relaxed
+  enforcement for prototyping and investigation.
+- **review** — PR review gates: all nine standards at `strict`. Maximal enforcement for
+  audit and pre-merge review.
+- **ops** — operational gates: defense in depth and consistent defaults are paramount.
+  Surface area and honesty checks at `warn` level.
+- **personal** — personal project gates: developer-like defaults, user-configurable.
 
 ### MCP Server
 

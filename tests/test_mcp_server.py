@@ -35,7 +35,7 @@ class TestModeTools:
         assert result["mode"] == "developer"
 
     async def test_set_mode_invalid(self) -> None:
-        result = json.loads(await ocd_set_mode("research"))
+        result = json.loads(await ocd_set_mode("bogus-mode"))
         assert result["ok"] is False
         assert "Unknown mode" in result["error"]
 
