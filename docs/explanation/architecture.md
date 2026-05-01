@@ -154,4 +154,4 @@ They are the immutable quality baseline:
 8. Deterministic Ordering
 9. Inconsistent Elimination
 
-Detailed documentation with examples is in [docs/standards.md](standards.md).
+Detailed documentation with examples is in [../reference/standards.md](../reference/standards.md).
