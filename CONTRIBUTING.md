@@ -4,14 +4,14 @@
 
 Use conventional prefix and a short kebab-case description:
 
-| Prefix | When to use |
-| ---------- | ---------------------------------------- |
-| `feat/` | New feature or enhancement |
-| `fix/` | Bug fix |
-| `docs/` | Documentation changes only |
-| `chore/` | Maintenance, tooling, CI, dependencies |
-| `refactor/`| Code restructuring without feature change|
-| `test/` | Test additions or improvements |
+| Prefix      | When to use                               |
+| ----------- | ----------------------------------------- |
+| `feat/`     | New feature or enhancement                |
+| `fix/`      | Bug fix                                   |
+| `docs/`     | Documentation changes only                |
+| `chore/`    | Maintenance, tooling, CI, dependencies    |
+| `refactor/` | Code restructuring without feature change |
+| `test/`     | Test additions or improvements            |
 
 Examples: `feat/mcp-convention-validator`, `fix/false-positive-dead-code`, `docs/standards-guide`.
 
