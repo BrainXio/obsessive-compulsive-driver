@@ -8,7 +8,9 @@ Each mode is a dict with:
 
 from __future__ import annotations
 
-MODE_DEFINITIONS: dict[str, dict] = {
+from typing import Any, cast
+
+MODE_DEFINITIONS: dict[str, dict[str, Any]] = {
     "developer": {
         "description": "Baseline development mode — all standards enforced at strict level",
         "standards": {
@@ -93,7 +95,7 @@ MODE_DEFINITIONS: dict[str, dict] = {
 ALLOWED_MODES: frozenset[str] = frozenset(MODE_DEFINITIONS.keys())
 
 
-def get_mode_config(mode: str) -> dict:
+def get_mode_config(mode: str) -> dict[str, Any]:
     """Return the full mode configuration dict."""
     return MODE_DEFINITIONS.get(mode, MODE_DEFINITIONS["developer"])
 
@@ -104,4 +106,5 @@ def get_standard_level(mode: str, standard: str) -> str:
     Returns 'strict' if mode or standard is unknown (safe default).
     """
     mode_config = MODE_DEFINITIONS.get(mode, MODE_DEFINITIONS["developer"])
-    return mode_config["standards"].get(standard, "strict")
+    standards: dict[str, str] = cast(dict[str, str], mode_config["standards"])
+    return standards.get(standard, "strict")

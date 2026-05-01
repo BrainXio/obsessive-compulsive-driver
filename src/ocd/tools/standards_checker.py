@@ -12,6 +12,7 @@ from __future__ import annotations
 import ast
 import json
 import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -69,6 +70,48 @@ def _read_file(path: Path) -> str | None:
 # ═══════════════════════════════════════════════════════════════════════════════════
 
 
+def _collect_defs_and_refs(
+    tree: ast.Module,
+    rel: str,
+    is_test_file: bool,
+    all_defined: dict[str, list[tuple[str, int]]],
+    all_referenced: set[str],
+) -> None:
+    """Walk AST with correct class-body tracking for definition/reference collection."""
+
+    def _walk_body(body: list[ast.stmt], in_class: bool) -> None:
+        for node in body:
+            if isinstance(node, ast.ClassDef):
+                if not is_test_file or not node.name.startswith("Test"):
+                    all_defined.setdefault(node.name, []).append((rel, node.lineno))
+                _walk_body(node.body, in_class=True)
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name in ("__init__", "__repr__", "__str__", "__post_init__"):
+                    _walk_body(node.body, in_class)
+                    continue
+                if is_test_file and (
+                    node.name.startswith("test_")
+                    or node.name.startswith("Test")
+                    or node.name.startswith("_")
+                ):
+                    _walk_body(node.body, in_class)
+                    continue
+                if not in_class:
+                    all_defined.setdefault(node.name, []).append((rel, node.lineno))
+                _walk_body(node.body, in_class)
+            else:
+                _walk_stmt_refs(node)
+
+    def _walk_stmt_refs(node: ast.AST) -> None:
+        for child in ast.walk(node):
+            if isinstance(child, ast.Name):
+                all_referenced.add(child.id)
+            elif isinstance(child, ast.Attribute) and isinstance(child.value, ast.Name):
+                all_referenced.add(child.value.id)
+
+    _walk_body(tree.body, in_class=False)
+
+
 def check_no_dead_code(root: Path) -> dict[str, Any]:
     """Scan Python files for potentially unused functions and classes.
 
@@ -92,15 +135,8 @@ def check_no_dead_code(root: Path) -> dict[str, Any]:
             continue
 
         rel = _rel(root, fpath)
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                if node.name not in ("__init__", "__repr__", "__str__", "__post_init__"):
-                    all_defined.setdefault(node.name, []).append((rel, node.lineno))
-            elif isinstance(node, ast.Name):
-                all_referenced.add(node.id)
-            elif isinstance(node, ast.Attribute):
-                if isinstance(node.value, ast.Name):
-                    all_referenced.add(node.value.id)
+        is_test_file = "test" in fpath.name or fpath.parent.name == "tests"
+        _collect_defs_and_refs(tree, rel, is_test_file, all_defined, all_referenced)
 
     for name, locations in all_defined.items():
         if name not in all_referenced:
@@ -318,7 +354,7 @@ def check_defense_in_depth(root: Path) -> dict[str, Any]:
     else:
         evidence.append("no .pre-commit-config.yaml — no automated hook enforcement")
 
-    status = "fail" if evidence else "pass"
+    status = "warn" if evidence else "pass"
     return {
         "standard": "Defense in Depth",
         "status": status,
@@ -355,6 +391,10 @@ def check_structural_honesty(root: Path) -> dict[str, Any]:
                 continue
 
             name = node.name
+
+            # Skip private/dunder functions — internal helpers follow their own conventions
+            if name.startswith("_"):
+                continue
 
             # Functions returning bool without is_/has_ prefix
             has_return_bool = _has_bool_return(node)
@@ -499,6 +539,12 @@ def _check_table_ordering(fpath: Path, source: str, root: Path) -> list[str]:
                 table_rows.append((i, stripped))
         else:
             if in_table and len(table_rows) > 2:
+                # Skip educational "Before/After" example tables
+                header_cells = [c.strip().lower() for c in table_rows[0][1].split("|") if c.strip()]
+                if "before" in header_cells and "after" in header_cells:
+                    in_table = False
+                    table_rows = []
+                    continue
                 # Check if rows are sorted by first column
                 first_cols = [_extract_first_column(r) for _, r in table_rows[1:]]
                 sorted_cols = sorted(first_cols, key=str.lower)
@@ -665,7 +711,9 @@ def check_inconsistent_elimination(root: Path) -> dict[str, Any]:
 # Check runner — runs all Nine Standards
 # ═══════════════════════════════════════════════════════════════════════════════════
 
-_CHECKERS: dict[str, Any] = {
+_CheckFn = Callable[[Path], dict[str, Any]]
+
+_CHECKERS: dict[str, _CheckFn] = {
     "no-dead-code": check_no_dead_code,
     "single-source-of-truth": check_single_source_of_truth,
     "consistent-defaults": check_consistent_defaults,

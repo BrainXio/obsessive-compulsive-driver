@@ -30,10 +30,10 @@ quality gate:
 
 This package externalizes that hypervigilance into tooling:
 
-- Noticing what's out of place before it causes a problem
 - Checking the same things, the same way, every time — without fatigue
-- Refusing to ship until every gate is green
 - Never letting "good enough" become the standard
+- Noticing what's out of place before it causes a problem
+- Refusing to ship until every gate is green
 
 ## What This Is
 
