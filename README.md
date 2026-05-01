@@ -62,28 +62,28 @@ OCD operates in modes. Each mode activates a specific bundle of rules, skills, a
 
 The sole interface is `ocd-mcp`, a FastMCP stdio server registered via `.mcp.json`.
 
-| Tool                           | Purpose                                          | OCD Parallel                                          |
-| ------------------------------ | ------------------------------------------------ | ----------------------------------------------------- |
-| `ocd_check`                    | Fast local quality gate                          | The quick pre-leaving-the-house check                 |
-| `ocd_ci_check`                 | Full CI mirror of all quality gates              | The exhaustive inspection before guests arrive        |
-| `ocd_get_mode`                 | Return currently active mode                     | Checking which checklist you're on                    |
-| `ocd_get_rules`                | Return structured enforcement rules              | Reading the manual cover to cover                     |
-| `ocd_lint_work`                | Lint specified files                             | Counting the steps as you walk                        |
-| `ocd_run_formatters`           | Run formatters with auto-fix                     | Aligning everything at perfect right angles           |
-| `ocd_scan_secrets`             | Scan for secrets using gitleaks                  | Checking the stove is off (again)                     |
-| `ocd_set_mode`                 | Switch active rule/gate/skill set                | Switching between different ritual routines           |
-| `ocd_standard_check`           | Run a single Nine Standards check                | Verifying one item on the checklist                   |
-| `ocd_standard_check_all`       | Run all Nine Standards checks                    | The full Sunday cleaning routine                      |
-| `ocd_standard_list`            | List available standard check names              | Reading the table of contents aloud                   |
-| `ocd_standards_update`         | Report current standards reference               | Updating the mental checklist                         |
-| `ocd_standards_verify`         | Verify standards hash consistency                | Making sure the rules haven't changed since yesterday |
-| `ocd_task_get`                 | Get a single task by ID                          | Reading the sticky note very carefully                |
-| `ocd_task_lifecycle_gate`      | Check task transition validity                   | Making sure you're not skipping steps                 |
-| `ocd_task_list`                | List tasks with status/priority filters          | Scanning the to-do board for what's next              |
-| `ocd_task_update`              | Update task fields with validation               | Correcting a mistake on the checklist                 |
-| `ocd_validate_mcp_conventions` | Validate MCP tool naming conventions             | Checking every drawer is labeled correctly            |
-| `ocd_validate_ppac_consistency`| Validate PPAC loop consistency                   | Tracing the circuit to make sure it loops             |
-| `ocd_verify_commit`            | Check commit messages for prohibited attribution | Re-reading the email one more time before sending     |
+| Tool                            | Purpose                                          | OCD Parallel                                          |
+| ------------------------------- | ------------------------------------------------ | ----------------------------------------------------- |
+| `ocd_check`                     | Fast local quality gate                          | The quick pre-leaving-the-house check                 |
+| `ocd_ci_check`                  | Full CI mirror of all quality gates              | The exhaustive inspection before guests arrive        |
+| `ocd_get_mode`                  | Return currently active mode                     | Checking which checklist you're on                    |
+| `ocd_get_rules`                 | Return structured enforcement rules              | Reading the manual cover to cover                     |
+| `ocd_lint_work`                 | Lint specified files                             | Counting the steps as you walk                        |
+| `ocd_run_formatters`            | Run formatters with auto-fix                     | Aligning everything at perfect right angles           |
+| `ocd_scan_secrets`              | Scan for secrets using gitleaks                  | Checking the stove is off (again)                     |
+| `ocd_set_mode`                  | Switch active rule/gate/skill set                | Switching between different ritual routines           |
+| `ocd_standard_check`            | Run a single Nine Standards check                | Verifying one item on the checklist                   |
+| `ocd_standard_check_all`        | Run all Nine Standards checks                    | The full Sunday cleaning routine                      |
+| `ocd_standard_list`             | List available standard check names              | Reading the table of contents aloud                   |
+| `ocd_standards_update`          | Report current standards reference               | Updating the mental checklist                         |
+| `ocd_standards_verify`          | Verify standards hash consistency                | Making sure the rules haven't changed since yesterday |
+| `ocd_task_get`                  | Get a single task by ID                          | Reading the sticky note very carefully                |
+| `ocd_task_lifecycle_gate`       | Check task transition validity                   | Making sure you're not skipping steps                 |
+| `ocd_task_list`                 | List tasks with status/priority filters          | Scanning the to-do board for what's next              |
+| `ocd_task_update`               | Update task fields with validation               | Correcting a mistake on the checklist                 |
+| `ocd_validate_mcp_conventions`  | Validate MCP tool naming conventions             | Checking every drawer is labeled correctly            |
+| `ocd_validate_ppac_consistency` | Validate PPAC loop consistency                   | Tracing the circuit to make sure it loops             |
+| `ocd_verify_commit`             | Check commit messages for prohibited attribution | Re-reading the email one more time before sending     |
 
 ## Nine Standards
 
