@@ -43,53 +43,53 @@ There is no CLI, no standalone scripts, and no Agent SDK orchestration.
 
 ### Mode Management
 
-| Tool              | Signature                 | Purpose                                |
+| Tool | Signature | Purpose |
 | ----------------- | ------------------------- | -------------------------------------- |
-| `ocd_get_mode`    | `() -> str`               | Return the currently active mode       |
-| `ocd_get_rules`   | `() -> str`               | Return structured protocol rules       |
-| `ocd_set_mode`    | `(mode: str) -> str`      | Switch the active rule/gate/skill set  |
+| `ocd_get_mode` | `() -> str` | Return the currently active mode |
+| `ocd_get_rules` | `() -> str` | Return structured protocol rules |
+| `ocd_set_mode` | `(mode: str) -> str` | Switch the active rule/gate/skill set |
 
 ### Quality Gates
 
-| Tool           | Signature                    | Purpose                                     |
+| Tool | Signature | Purpose |
 | -------------- | ---------------------------- | ------------------------------------------- |
-| `ocd_check`    | `() -> str`                  | Fast local quality gate (pre-commit)        |
-| `ocd_ci_check` | `(fast: bool = False) -> str`| Full CI mirror of all quality gates         |
+| `ocd_check` | `() -> str` | Fast local quality gate (pre-commit) |
+| `ocd_ci_check` | `(fast: bool = False) -> str`| Full CI mirror of all quality gates |
 
 ### Standards Checks
 
-| Tool                     | Signature                   | Purpose                                   |
+| Tool | Signature | Purpose |
 | ------------------------ | --------------------------- | ----------------------------------------- |
-| `ocd_standard_check`     | `(name: str) -> str`        | Run a single named standard check         |
-| `ocd_standard_check_all` | `() -> str`                 | Run all Nine Standards checks             |
-| `ocd_standard_list`      | `() -> str`                 | List available standard check names       |
-| `ocd_standards_update`   | `() -> str`                 | Report current standards reference + hash |
-| `ocd_standards_verify`   | `() -> str`                 | Verify standards hash consistency         |
+| `ocd_standard_check` | `(name: str) -> str` | Run a single named standard check |
+| `ocd_standard_check_all` | `() -> str` | Run all Nine Standards checks |
+| `ocd_standard_list` | `() -> str` | List available standard check names |
+| `ocd_standards_update` | `() -> str` | Report current standards reference + hash |
+| `ocd_standards_verify` | `() -> str` | Verify standards hash consistency |
 
 ### Validators
 
-| Tool                             | Signature    | Purpose                                    |
+| Tool | Signature | Purpose |
 | -------------------------------- | ------------ | ------------------------------------------ |
-| `ocd_validate_mcp_conventions`   | `() -> str`  | Validate MCP tool naming conventions       |
-| `ocd_validate_ppac_consistency`  | `() -> str`  | Validate PPAC loop consistency             |
+| `ocd_validate_mcp_conventions` | `() -> str` | Validate MCP tool naming conventions |
+| `ocd_validate_ppac_consistency` | `() -> str` | Validate PPAC loop consistency |
 
 ### Enforcement
 
-| Tool                 | Signature                        | Purpose                                       |
+| Tool | Signature | Purpose |
 | -------------------- | -------------------------------- | --------------------------------------------- |
-| `ocd_lint_work`      | `(files: list[str]) -> str`      | Lint specified files and report violations    |
-| `ocd_run_formatters` | `() -> str`                      | Run formatters with auto-fix                  |
-| `ocd_scan_secrets`   | `(staged: bool = False) -> str`  | Scan for secrets using gitleaks               |
-| `ocd_verify_commit`  | `(message: str) -> str`          | Check commit messages for prohibited patterns |
+| `ocd_lint_work` | `(files: list[str]) -> str` | Lint specified files and report violations |
+| `ocd_run_formatters` | `() -> str` | Run formatters with auto-fix |
+| `ocd_scan_secrets` | `(staged: bool = False) -> str` | Scan for secrets using gitleaks |
+| `ocd_verify_commit` | `(message: str) -> str` | Check commit messages for prohibited patterns |
 
 ### Task Enforcer
 
-| Tool                      | Signature                                           | Purpose                                   |
+| Tool | Signature | Purpose |
 | ------------------------- | --------------------------------------------------- | ----------------------------------------- |
-| `ocd_task_get`            | `(task_id: str) -> str`                             | Get a task by ID                          |
-| `ocd_task_lifecycle_gate` | `(task_id: str, target_status: str) -> str`         | Run lifecycle gate checks on transitions  |
-| `ocd_task_list`           | `(status: str = None, priority_min: int = 0) -> str`| List all tracked tasks with filters       |
-| `ocd_task_update`         | `(task_id: str, updates: dict) -> str`              | Update task status and metadata           |
+| `ocd_task_get` | `(task_id: str) -> str` | Get a task by ID |
+| `ocd_task_lifecycle_gate` | `(task_id: str, target_status: str) -> str` | Run lifecycle gate checks on transitions |
+| `ocd_task_list` | `(status: str = None, priority_min: int = 0) -> str`| List all tracked tasks with filters |
+| `ocd_task_update` | `(task_id: str, updates: dict) -> str` | Update task status and metadata |
 
 ## Mode System
 
@@ -97,13 +97,13 @@ OCD operates in five modes. Each mode activates a specific bundle of rules and
 enforcement levels. All Five Standards use three levels: `strict`, `warn`, and
 `skip`.
 
-| Mode        | Purpose                                      | Key Relaxations                |
+| Mode | Purpose | Key Relaxations |
 | ----------- | -------------------------------------------- | ------------------------------ |
-| `developer` | Baseline development — strict core gates     | Surface area, SST at warn      |
-| `research`  | Exploration/prototyping — relaxed dead code  | Dead code, surface area skip   |
-| `review`    | Pre-merge audit — all nine standards strict  | None                           |
-| `ops`       | Operations/security — defense-in-depth focus | Surface area at warn           |
-| `personal`  | User-configurable — developer-like defaults  | Several standards at warn      |
+| `developer` | Baseline development — strict core gates | Surface area, SST at warn |
+| `research` | Exploration/prototyping — relaxed dead code | Dead code, surface area skip |
+| `review` | Pre-merge audit — all nine standards strict | None |
+| `ops` | Operations/security — defense-in-depth focus | Surface area at warn |
+| `personal` | User-configurable — developer-like defaults | Several standards at warn |
 
 Mode definitions live in `src/ocd/modes/mode_definitions.py` as
 `MODE_DEFINITIONS` with per-standard enforcement levels. The mode switch via
@@ -121,12 +121,12 @@ backlog → ready → in_progress → done → archived
 
 Each transition triggers appropriate Nine Standards checks:
 
-| Transition            | Gates Required                     |
+| Transition | Gates Required |
 | --------------------- | ---------------------------------- |
-| `backlog` → `ready`   | Deterministic Ordering, Minimal SA |
-| `ready` → `in_progress`| No Dead Code, Single Source       |
-| `in_progress` → `done`| All Nine Standards                 |
-| any → `blocked`       | Reason recording only              |
+| `backlog` → `ready` | Deterministic Ordering, Minimal SA |
+| `ready` → `in_progress`| No Dead Code, Single Source |
+| `in_progress` → `done`| All Nine Standards |
+| any → `blocked` | Reason recording only |
 
 Cross-repo dependencies are validated by resolving task IDs across all four
 BrainXio repos (ADHD, AI, ASD, OCD) and detecting circular or unresolvable

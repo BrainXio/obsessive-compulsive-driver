@@ -4,14 +4,14 @@
 
 Use conventional prefix and a short kebab-case description:
 
-| Prefix     | When to use                              |
+| Prefix | When to use |
 | ---------- | ---------------------------------------- |
-| `feat/`    | New feature or enhancement               |
-| `fix/`     | Bug fix                                  |
-| `docs/`    | Documentation changes only               |
-| `chore/`   | Maintenance, tooling, CI, dependencies   |
+| `feat/` | New feature or enhancement |
+| `fix/` | Bug fix |
+| `docs/` | Documentation changes only |
+| `chore/` | Maintenance, tooling, CI, dependencies |
 | `refactor/`| Code restructuring without feature change|
-| `test/`    | Test additions or improvements           |
+| `test/` | Test additions or improvements |
 
 Examples: `feat/mcp-convention-validator`, `fix/false-positive-dead-code`, `docs/standards-guide`.
 
@@ -28,6 +28,7 @@ Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `style`.
 Scopes: `gate`, `ci`, `lint`, `secrets`, `mode`, `standards`, `mcp`, `docs`.
 
 Examples:
+
 - `feat(gate): add MCP convention validation check`
 - `fix(standards): handle pytest discovery in dead code checker`
 - `docs(mode): add ops mode documentation`
@@ -37,7 +38,9 @@ Keep descriptions concise and imperative.
 ## PR Workflow
 
 1. Create a feature branch from `main`
+
 2. Implement with tests
+
 3. Run the local CI gate before pushing:
 
    ```bash
@@ -48,7 +51,9 @@ Keep descriptions concise and imperative.
    ```
 
 4. Push and open a PR against `main`
+
 5. Post the PR URL to the ADHD bus for review
+
 6. Do not self-merge — wait for a supporter review
 
 ## Code Style
