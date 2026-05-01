@@ -14,6 +14,9 @@ from typing import Any, cast
 from mcp.server.fastmcp import FastMCP
 
 from ocd.modes import ALLOWED_MODES
+from ocd.rules import (
+    get_rules as get_ocd_rules,
+)
 from ocd.standards_data import (
     check_message,
     compute_standards_hash,
@@ -602,6 +605,17 @@ async def ocd_standard_check_all() -> str:
 async def ocd_standard_list() -> str:
     """List available standard check names."""
     return json.dumps({"standards": sorted(_CHECKER_NAMES)}, indent=2)
+
+
+@mcp.tool()
+async def ocd_get_rules() -> str:
+    """Return structured protocol rules for the OCD enforcement layer.
+
+    Returns a JSON object describing the Nine Standards, mode definitions,
+    quality gates, lifecycle gates, env vars, and tool listing.
+    Agents can call this at startup to learn how the enforcement layer works.
+    """
+    return json.dumps(get_ocd_rules(), indent=2)
 
 
 @mcp.tool()
