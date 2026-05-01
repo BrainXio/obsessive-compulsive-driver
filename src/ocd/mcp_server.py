@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from mcp.server.fastmcp import FastMCP
 
@@ -20,6 +20,7 @@ from ocd.standards_data import (
     get_standards_reference,
     verify_standards_hash,
 )
+from ocd.task_enforcer.validation import validate_task_update
 from ocd.tools.standards_checker import _CHECKER_NAMES, StandardsChecker
 
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
@@ -708,6 +709,215 @@ async def ocd_validate_ppac_consistency() -> str:
             "check": "ppac-consistency",
             "status": status,
             "evidence": evidence[:20],
+        },
+        indent=2,
+    )
+
+
+# ── Task-enforcer tools ─────────────────────────────────────────────────────
+
+
+def _load_tasks_json(root: Path) -> dict[str, Any]:
+    """Load tasks.json from the project root."""
+    path = root / "tasks.json"
+    if not path.exists():
+        return {}
+    try:
+        return cast(dict[str, Any], json.loads(path.read_text()))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+@mcp.tool()
+async def ocd_task_list(status: str = "", priority_min: int = 0) -> str:
+    """List all tasks with optional kanban_status and priority filters.
+
+    Args:
+        status: Filter by kanban_status (ready, backlog, blocked, in_progress, done, archived).
+        priority_min: Only return tasks with priority level >= this value.
+    """
+    root = _find_project_root()
+    data = _load_tasks_json(root)
+    pending = data.get("pending", [])
+    completed = data.get("completed", [])
+
+    results: list[dict[str, Any]] = []
+    for t in pending:
+        if not isinstance(t, dict):
+            continue
+        t_status = t.get("kanban_status", "backlog")
+        if status and t_status != status:
+            continue
+
+        p = t.get("priority", {})
+        if isinstance(p, dict):
+            level = p.get("level", 3)
+        else:
+            level = p if isinstance(p, int) else 3
+        if priority_min and level < priority_min:
+            continue
+
+        results.append(
+            {
+                "id": t.get("id"),
+                "subject": t.get("subject"),
+                "kanban_status": t_status,
+                "priority_level": level,
+                "done": t.get("done", False),
+                "dependencies": t.get("dependencies", []),
+            }
+        )
+
+    return json.dumps(
+        {
+            "count": len(results),
+            "completed_count": len(completed),
+            "total_pending": len(pending),
+            "tasks": sorted(
+                results,
+                key=lambda r: (r["kanban_status"] != "ready", -(r["priority_level"] or 3)),
+            ),
+        },
+        indent=2,
+    )
+
+
+@mcp.tool()
+async def ocd_task_get(task_id: str) -> str:
+    """Get a single task by ID with full details.
+
+    Args:
+        task_id: The task identifier (e.g., 'ocd-1', 'ocd-11').
+    """
+    root = _find_project_root()
+    data = _load_tasks_json(root)
+
+    for t in data.get("pending", []):
+        if isinstance(t, dict) and t.get("id") == task_id:
+            return json.dumps(t, indent=2)
+
+    return json.dumps({"ok": False, "detail": f"task '{task_id}' not found"})
+
+
+@mcp.tool()
+async def ocd_task_update(task_id: str, updates: dict[str, Any]) -> str:
+    """Update task fields and write back to tasks.json after validation.
+
+    Args:
+        task_id: The task identifier to update.
+        updates: Dict of field names to new values (e.g., {'kanban_status': 'in_progress'}).
+    """
+    root = _find_project_root()
+    path = root / "tasks.json"
+
+    validation = validate_task_update(task_id, updates)
+    if not validation.is_valid:
+        return json.dumps(
+            {
+                "ok": False,
+                "detail": "validation failed",
+                "errors": [{"field": e.field, "message": e.message} for e in validation.errors],
+            },
+            indent=2,
+        )
+
+    if not path.exists():
+        return json.dumps({"ok": False, "detail": "tasks.json not found"})
+
+    try:
+        data = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        return json.dumps({"ok": False, "detail": f"cannot read tasks.json: {exc}"})
+
+    updated = False
+    for t in data.get("pending", []):
+        if isinstance(t, dict) and t.get("id") == task_id:
+            t.update(updates)
+            updated = True
+            break
+
+    if not updated:
+        return json.dumps({"ok": False, "detail": f"task '{task_id}' not found"})
+
+    path.write_text(json.dumps(data, indent=2) + "\n")
+    return json.dumps({"ok": True, "detail": f"task '{task_id}' updated", "applied": updates})
+
+
+@mcp.tool()
+async def ocd_task_lifecycle_gate(task_id: str, target_status: str) -> str:
+    """Check whether a task can transition to the target Kanban status.
+
+    Validates the transition against lifecycle rules and runs standard
+    checks appropriate for the transition.
+
+    Args:
+        task_id: The task identifier.
+        target_status: The target kanban_status to validate transition to.
+    """
+    root = _find_project_root()
+    data = _load_tasks_json(root)
+
+    current = None
+    for t in data.get("pending", []):
+        if isinstance(t, dict) and t.get("id") == task_id:
+            current = t
+            break
+
+    if current is None:
+        return json.dumps({"ok": False, "detail": f"task '{task_id}' not found"})
+
+    current_status = current.get("kanban_status", "backlog")
+
+    # Valid transitions
+    valid_transitions: dict[str, set[str]] = {
+        "backlog": {"ready", "archived"},
+        "ready": {"in_progress", "backlog", "archived"},
+        "in_progress": {"done", "blocked", "ready"},
+        "blocked": {"ready", "in_progress", "archived"},
+        "done": {"archived"},
+        "archived": set(),
+    }
+
+    allowed = valid_transitions.get(current_status, set())
+    if target_status not in allowed:
+        return json.dumps(
+            {
+                "ok": False,
+                "detail": f"transition '{current_status}' → '{target_status}' is not allowed",
+                "allowed_transitions": sorted(allowed),
+            }
+        )
+
+    # Run appropriate gate checks per transition type
+    gates_required: list[str] = []
+    if target_status == "done":
+        gates_required = sorted(_CHECKER_NAMES)
+    elif target_status == "ready":
+        gates_required = ["deterministic-ordering", "minimal-surface-area"]
+    elif target_status == "in_progress":
+        gates_required = ["no-dead-code", "single-source-of-truth"]
+
+    gate_results: dict[str, str] = {}
+    if gates_required:
+        checker = StandardsChecker(root)
+        for name in gates_required:
+            r = checker.run_one(name)
+            gate_results[name] = r["status"]
+
+    blocked_by_failures = [n for n, s in gate_results.items() if s == "fail"]
+    all_gates_passed = len(blocked_by_failures) == 0
+
+    return json.dumps(
+        {
+            "ok": all_gates_passed,
+            "task_id": task_id,
+            "current_status": current_status,
+            "target_status": target_status,
+            "transition_allowed": True,
+            "gates_required": gates_required,
+            "gates_passed": all_gates_passed,
+            "gate_results": gate_results,
+            "blocked_by": blocked_by_failures or None,
         },
         indent=2,
     )
