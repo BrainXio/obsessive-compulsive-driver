@@ -156,6 +156,22 @@ class TestDefenseInDepth:
             assert result["standard"] == "Defense in Depth"
             assert result["status"] in ("pass", "fail", "warn", "skip")
 
+    def test_protected_files_present(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_files(root, {"prompt.txt": "# agent instructions\n"})
+            result = check_defense_in_depth(root)
+            evidence_str = " ".join(result["evidence"])
+            assert "prompt.txt" not in evidence_str
+
+    def test_protected_files_missing(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = check_defense_in_depth(root)
+            evidence_str = " ".join(result["evidence"])
+            assert "prompt.txt" in evidence_str
+            assert "must not be deleted" in evidence_str
+
 
 class TestStructuralHonesty:
     def test_flag_bool_return_without_is_prefix(self) -> None:

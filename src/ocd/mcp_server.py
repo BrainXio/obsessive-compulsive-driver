@@ -937,6 +937,104 @@ async def ocd_task_lifecycle_gate(task_id: str, target_status: str) -> str:
     )
 
 
+@mcp.tool()
+async def ocd_task_claim(task_id: str = "") -> str:
+    """Claim the highest-priority ready task and return a bus claim message.
+
+    If task_id is provided, claims that specific task. Otherwise auto-selects
+    the highest-priority task with status 'ready' or 'backlog'.
+    Updates kanban_status to 'in_progress' in tasks.json.
+
+    Args:
+        task_id: Specific task to claim, or empty string to auto-select.
+    """
+    root = _find_project_root()
+    data = _load_tasks_json(root)
+    pending = data.get("pending", [])
+
+    if not pending:
+        return json.dumps({"ok": False, "detail": "no pending tasks"})
+
+    completed_ids = {c.split(":")[0].strip() for c in data.get("completed", [])}
+
+    claimable: list[tuple[int, dict[str, Any]]] = []
+    for t in pending:
+        if not isinstance(t, dict):
+            continue
+        if t.get("done"):
+            continue
+        status = t.get("kanban_status", "backlog")
+        if status not in ("ready", "backlog"):
+            continue
+
+        deps = t.get("dependencies", [])
+        if deps:
+            unmet = [d for d in deps if d not in completed_ids]
+            if unmet:
+                continue
+
+        p = t.get("priority", {})
+        level = p.get("level", 3) if isinstance(p, dict) else (p if isinstance(p, int) else 3)
+        claimable.append((level, t))
+
+    if not claimable:
+        return json.dumps(
+            {
+                "ok": False,
+                "detail": (
+                    "no claimable tasks — all are done, in_progress, "
+                    "blocked, or have unmet dependencies"
+                ),
+            }
+        )
+
+    if task_id:
+        matches = [(lvl, t) for lvl, t in claimable if t.get("id") == task_id]
+        if not matches:
+            return json.dumps(
+                {"ok": False, "detail": f"task '{task_id}' not found or not claimable"}
+            )
+        _, selected = matches[0]
+    else:
+        claimable.sort(key=lambda x: (x[0], x[1].get("id", "")))
+        _, selected = claimable[0]
+
+    tid = selected["id"]
+    repo = data.get("meta", {}).get("repository", root.name)
+
+    selected["kanban_status"] = "in_progress"
+
+    path = root / "tasks.json"
+    path.write_text(json.dumps(data, indent=2) + "\n")
+
+    claim_msg = {
+        "type": "status",
+        "topic": "agent-claim",
+        "payload": {
+            "task": tid,
+            "claimed_by": "<agent_id>",
+            "repo": repo,
+        },
+    }
+
+    priority = selected.get("priority", {})
+    level = priority.get("level", 3) if isinstance(priority, dict) else priority
+
+    return json.dumps(
+        {
+            "ok": True,
+            "detail": f"task '{tid}' claimed — post the bus_message via adhd_post",
+            "claimed_task": {
+                "id": tid,
+                "subject": selected.get("subject"),
+                "priority_level": level,
+            },
+            "bus_message": claim_msg,
+        },
+        indent=2,
+    )
+
+
 # ── Entry point ──────────────────────────────────────────────────────────────
 
 

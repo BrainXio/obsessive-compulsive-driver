@@ -16,6 +16,7 @@ from ocd.mcp_server import (
     ocd_set_mode,
     ocd_standards_update,
     ocd_standards_verify,
+    ocd_task_claim,
     ocd_task_get,
     ocd_task_lifecycle_gate,
     ocd_task_list,
@@ -260,10 +261,16 @@ class TestGetRules:
         assert len(rules["tools"]) >= 10
 
 
-# ── Task-enforcer tools ───────────────────────────────────────────────────
+# ── Task-enforcer tools ───────────────────────────────────────────────────────
+
+
+def _mock_project_root():
+    return __import__("pathlib").Path("/tmp")
 
 
 class TestTaskList:
+    """Tests for ocd_task_list MCP tool."""
+
     async def test_task_list_returns_structure(self, monkeypatch: pytest.MonkeyPatch) -> None:
         def _mock_load(root):
             return {
@@ -275,9 +282,7 @@ class TestTaskList:
             }
 
         monkeypatch.setattr("ocd.mcp_server._load_tasks_json", _mock_load)
-        monkeypatch.setattr(
-            "ocd.mcp_server._find_project_root", lambda: __import__("pathlib").Path("/tmp")
-        )
+        monkeypatch.setattr("ocd.mcp_server._find_project_root", _mock_project_root)
 
         result = json.loads(await ocd_task_list())
         assert result["count"] == 2
@@ -295,9 +300,7 @@ class TestTaskList:
             }
 
         monkeypatch.setattr("ocd.mcp_server._load_tasks_json", _mock_load)
-        monkeypatch.setattr(
-            "ocd.mcp_server._find_project_root", lambda: __import__("pathlib").Path("/tmp")
-        )
+        monkeypatch.setattr("ocd.mcp_server._find_project_root", _mock_project_root)
 
         result = json.loads(await ocd_task_list(status="ready"))
         assert result["count"] == 1
@@ -323,9 +326,7 @@ class TestTaskList:
             }
 
         monkeypatch.setattr("ocd.mcp_server._load_tasks_json", _mock_load)
-        monkeypatch.setattr(
-            "ocd.mcp_server._find_project_root", lambda: __import__("pathlib").Path("/tmp")
-        )
+        monkeypatch.setattr("ocd.mcp_server._find_project_root", _mock_project_root)
 
         result = json.loads(await ocd_task_list(priority_min=2))
         assert result["count"] == 1
@@ -333,6 +334,8 @@ class TestTaskList:
 
 
 class TestTaskGet:
+    """Tests for ocd_task_get MCP tool."""
+
     async def test_task_get_found(self, monkeypatch: pytest.MonkeyPatch) -> None:
         def _mock_load(root):
             return {
@@ -342,9 +345,7 @@ class TestTaskGet:
             }
 
         monkeypatch.setattr("ocd.mcp_server._load_tasks_json", _mock_load)
-        monkeypatch.setattr(
-            "ocd.mcp_server._find_project_root", lambda: __import__("pathlib").Path("/tmp")
-        )
+        monkeypatch.setattr("ocd.mcp_server._find_project_root", _mock_project_root)
 
         result = json.loads(await ocd_task_get("ocd-1"))
         assert result["id"] == "ocd-1"
@@ -355,9 +356,7 @@ class TestTaskGet:
             return {"pending": []}
 
         monkeypatch.setattr("ocd.mcp_server._load_tasks_json", _mock_load)
-        monkeypatch.setattr(
-            "ocd.mcp_server._find_project_root", lambda: __import__("pathlib").Path("/tmp")
-        )
+        monkeypatch.setattr("ocd.mcp_server._find_project_root", _mock_project_root)
 
         result = json.loads(await ocd_task_get("ocd-99"))
         assert result["ok"] is False
@@ -365,12 +364,12 @@ class TestTaskGet:
 
 
 class TestTaskUpdate:
-    async def test_task_update_success(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-        import json as _json
+    """Tests for ocd_task_update MCP tool."""
 
+    async def test_task_update_success(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
         tasks_path = tmp_path / "tasks.json"
         tasks_path.write_text(
-            _json.dumps(
+            json.dumps(
                 {
                     "pending": [
                         {
@@ -390,14 +389,13 @@ class TestTaskUpdate:
         assert result["ok"] is True
         assert "updated" in result["detail"]
 
-        updated = _json.loads(tasks_path.read_text())
+        # Verify written
+        updated = json.loads(tasks_path.read_text())
         assert updated["pending"][0]["kanban_status"] == "ready"
 
     async def test_task_update_not_found(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-        import json as _json
-
         tasks_path = tmp_path / "tasks.json"
-        tasks_path.write_text(_json.dumps({"pending": []}))
+        tasks_path.write_text(json.dumps({"pending": []}))
 
         monkeypatch.setattr("ocd.mcp_server._find_project_root", lambda: tmp_path)
 
@@ -412,6 +410,8 @@ class TestTaskUpdate:
 
 
 class TestTaskLifecycleGate:
+    """Tests for ocd_task_lifecycle_gate MCP tool."""
+
     async def test_valid_transition(self, monkeypatch: pytest.MonkeyPatch) -> None:
         def _mock_load(root):
             return {
@@ -421,9 +421,7 @@ class TestTaskLifecycleGate:
             }
 
         monkeypatch.setattr("ocd.mcp_server._load_tasks_json", _mock_load)
-        monkeypatch.setattr(
-            "ocd.mcp_server._find_project_root", lambda: __import__("pathlib").Path("/tmp")
-        )
+        monkeypatch.setattr("ocd.mcp_server._find_project_root", _mock_project_root)
 
         result = json.loads(await ocd_task_lifecycle_gate("ocd-1", "ready"))
         assert result["ok"] is True
@@ -440,23 +438,192 @@ class TestTaskLifecycleGate:
             }
 
         monkeypatch.setattr("ocd.mcp_server._load_tasks_json", _mock_load)
-        monkeypatch.setattr(
-            "ocd.mcp_server._find_project_root", lambda: __import__("pathlib").Path("/tmp")
-        )
+        monkeypatch.setattr("ocd.mcp_server._find_project_root", _mock_project_root)
 
         result = json.loads(await ocd_task_lifecycle_gate("ocd-1", "ready"))
         assert result["ok"] is False
         assert "not allowed" in result["detail"]
+        assert result["allowed_transitions"] == ["archived"]
 
     async def test_task_not_found(self, monkeypatch: pytest.MonkeyPatch) -> None:
         def _mock_load(root):
             return {"pending": []}
 
         monkeypatch.setattr("ocd.mcp_server._load_tasks_json", _mock_load)
-        monkeypatch.setattr(
-            "ocd.mcp_server._find_project_root", lambda: __import__("pathlib").Path("/tmp")
-        )
+        monkeypatch.setattr("ocd.mcp_server._find_project_root", _mock_project_root)
 
         result = json.loads(await ocd_task_lifecycle_gate("ocd-99", "ready"))
         assert result["ok"] is False
         assert "not found" in result["detail"]
+
+
+class TestTaskClaim:
+    """Tests for ocd_task_claim MCP tool."""
+
+    async def test_claim_auto_selects_highest_priority(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        tasks_path = tmp_path / "tasks.json"
+        tasks_path.write_text(
+            json.dumps(
+                {
+                    "meta": {"repository": "test-repo"},
+                    "completed": ["ocd-0"],
+                    "pending": [
+                        {
+                            "id": "ocd-1",
+                            "subject": "low priority",
+                            "priority": {"level": 3, "rpe_weight": 0.5, "value_score": 50},
+                            "kanban_status": "ready",
+                            "done": False,
+                            "dependencies": [],
+                        },
+                        {
+                            "id": "ocd-2",
+                            "subject": "high priority",
+                            "priority": {"level": 1, "rpe_weight": 0.9, "value_score": 90},
+                            "kanban_status": "ready",
+                            "done": False,
+                            "dependencies": [],
+                        },
+                    ],
+                }
+            )
+        )
+
+        monkeypatch.setattr("ocd.mcp_server._find_project_root", lambda: tmp_path)
+
+        result = json.loads(await ocd_task_claim())
+        assert result["ok"] is True
+        assert result["claimed_task"]["id"] == "ocd-2"
+
+        # Verify written
+        updated = json.loads(tasks_path.read_text())
+        claimed = next(t for t in updated["pending"] if t["id"] == "ocd-2")
+        assert claimed["kanban_status"] == "in_progress"
+
+    async def test_claim_specific_task(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+        tasks_path = tmp_path / "tasks.json"
+        tasks_path.write_text(
+            json.dumps(
+                {
+                    "meta": {"repository": "test-repo"},
+                    "completed": [],
+                    "pending": [
+                        {
+                            "id": "ocd-1",
+                            "subject": "first",
+                            "kanban_status": "ready",
+                            "priority": {"level": 2},
+                            "done": False,
+                            "dependencies": [],
+                        },
+                    ],
+                }
+            )
+        )
+
+        monkeypatch.setattr("ocd.mcp_server._find_project_root", lambda: tmp_path)
+
+        result = json.loads(await ocd_task_claim(task_id="ocd-1"))
+        assert result["ok"] is True
+        assert result["claimed_task"]["id"] == "ocd-1"
+        assert "bus_message" in result
+
+    async def test_claim_skips_done_tasks(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+        tasks_path = tmp_path / "tasks.json"
+        tasks_path.write_text(
+            json.dumps(
+                {
+                    "meta": {"repository": "test-repo"},
+                    "completed": [],
+                    "pending": [
+                        {
+                            "id": "ocd-1",
+                            "subject": "done task",
+                            "kanban_status": "backlog",
+                            "priority": {"level": 1},
+                            "done": True,
+                            "dependencies": [],
+                        },
+                    ],
+                }
+            )
+        )
+
+        monkeypatch.setattr("ocd.mcp_server._find_project_root", lambda: tmp_path)
+
+        result = json.loads(await ocd_task_claim())
+        assert result["ok"] is False
+        assert "no claimable tasks" in result["detail"]
+
+    async def test_claim_skips_blocked_by_deps(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        tasks_path = tmp_path / "tasks.json"
+        tasks_path.write_text(
+            json.dumps(
+                {
+                    "meta": {"repository": "test-repo"},
+                    "completed": [],
+                    "pending": [
+                        {
+                            "id": "ocd-2",
+                            "subject": "blocked task",
+                            "kanban_status": "ready",
+                            "priority": {"level": 1},
+                            "done": False,
+                            "dependencies": ["ocd-1"],
+                        },
+                    ],
+                }
+            )
+        )
+
+        monkeypatch.setattr("ocd.mcp_server._find_project_root", lambda: tmp_path)
+
+        result = json.loads(await ocd_task_claim())
+        assert result["ok"] is False
+        assert "no claimable tasks" in result["detail"]
+
+    async def test_claim_task_not_found(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+        tasks_path = tmp_path / "tasks.json"
+        tasks_path.write_text(json.dumps({"meta": {"repository": "test"}, "pending": []}))
+
+        monkeypatch.setattr("ocd.mcp_server._find_project_root", lambda: tmp_path)
+
+        result = json.loads(await ocd_task_claim(task_id="ocd-99"))
+        assert result["ok"] is False
+
+    async def test_claim_bus_message_format(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        tasks_path = tmp_path / "tasks.json"
+        tasks_path.write_text(
+            json.dumps(
+                {
+                    "meta": {"repository": "test-repo"},
+                    "completed": [],
+                    "pending": [
+                        {
+                            "id": "ocd-1",
+                            "subject": "first",
+                            "kanban_status": "ready",
+                            "priority": {"level": 2},
+                            "done": False,
+                            "dependencies": [],
+                        },
+                    ],
+                }
+            )
+        )
+
+        monkeypatch.setattr("ocd.mcp_server._find_project_root", lambda: tmp_path)
+
+        result = json.loads(await ocd_task_claim())
+        assert result["ok"] is True
+        msg = result["bus_message"]
+        assert msg["type"] == "status"
+        assert msg["topic"] == "agent-claim"
+        assert msg["payload"]["task"] == "ocd-1"
+        assert msg["payload"]["repo"] == "test-repo"

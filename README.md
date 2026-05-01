@@ -67,27 +67,27 @@ The sole interface is `ocd-mcp`, a FastMCP stdio server registered via `.mcp.jso
 | `ocd_check`                     | Fast local quality gate                          | The quick pre-leaving-the-house check                 |
 | `ocd_ci_check`                  | Full CI mirror of all quality gates              | The exhaustive inspection before guests arrive        |
 | `ocd_get_mode`                  | Return currently active mode                     | Checking which checklist you're on                    |
-| `ocd_get_rules`                 | Return structured enforcement rules              | Reading the manual cover to cover                     |
+| `ocd_get_rules`                 | Return structured protocol rules                 | Reciting the rulebook from memory for the 50th time   |
 | `ocd_lint_work`                 | Lint specified files                             | Counting the steps as you walk                        |
 | `ocd_run_formatters`            | Run formatters with auto-fix                     | Aligning everything at perfect right angles           |
 | `ocd_scan_secrets`              | Scan for secrets using gitleaks                  | Checking the stove is off (again)                     |
 | `ocd_set_mode`                  | Switch active rule/gate/skill set                | Switching between different ritual routines           |
-| `ocd_standard_check`            | Run a single Nine Standards check                | Verifying one item on the checklist                   |
-| `ocd_standard_check_all`        | Run all Nine Standards checks                    | The full Sunday cleaning routine                      |
-| `ocd_standard_list`             | List available standard check names              | Reading the table of contents aloud                   |
+| `ocd_standard_check`            | Run a single named standard check                | Checking one specific thing is exactly right          |
+| `ocd_standard_check_all`        | Run all Nine Standards checks                    | Running through the entire checklist                  |
+| `ocd_standard_list`             | List available standard check names              | Reading the checklist to make sure nothing is missing |
 | `ocd_standards_update`          | Report current standards reference               | Updating the mental checklist                         |
 | `ocd_standards_verify`          | Verify standards hash consistency                | Making sure the rules haven't changed since yesterday |
-| `ocd_task_get`                  | Get a single task by ID                          | Reading the sticky note very carefully                |
-| `ocd_task_lifecycle_gate`       | Check task transition validity                   | Making sure you're not skipping steps                 |
-| `ocd_task_list`                 | List tasks with status/priority filters          | Scanning the to-do board for what's next              |
-| `ocd_task_update`               | Update task fields with validation               | Correcting a mistake on the checklist                 |
-| `ocd_validate_mcp_conventions`  | Validate MCP tool naming conventions             | Checking every drawer is labeled correctly            |
-| `ocd_validate_ppac_consistency` | Validate PPAC loop consistency                   | Tracing the circuit to make sure it loops             |
+| `ocd_task_claim`                | Claim highest-priority ready task                | Grabbing the next ticket off the board                |
+| `ocd_task_get`                  | Get a task by ID                                 | Pulling up a specific task from the stack             |
+| `ocd_task_lifecycle_gate`       | Run lifecycle gate checks on task transitions    | Checking every step of the process before moving on   |
+| `ocd_task_list`                 | List all tracked tasks                           | Reading the to-do list out loud                       |
+| `ocd_task_update`               | Update task status and metadata                  | Checking off a completed item                         |
+| `ocd_validate_mcp_conventions`  | Validate MCP tool naming conventions             | Making sure all tools are labeled consistently        |
+| `ocd_validate_ppac_consistency` | Validate PPAC loop consistency                   | Verifying the decision loop has no gaps               |
 | `ocd_verify_commit`             | Check commit messages for prohibited attribution | Re-reading the email one more time before sending     |
 
-## Nine Standards
-
-For detailed documentation of all Nine Standards with code examples, see [`docs/standards.md`](docs/standards.md).
+The [Nine Standards](docs/standards.md) that underpin these tools are documented in detail with
+examples and enforcement levels.
 
 ## Installation
 
@@ -155,6 +155,13 @@ Set `OCD_MODE=review` when running in a PR review context to activate diff-aware
 OCD_MODE=review uv run ocd-mcp
 ```
 
+## Graceful Degradation
+
+Missing gitleaks? Secrets check skips. No mypy? Type check skips. Every tool degrades
+to `"skipped"` instead of crashing — you get the checks you can, with clear messaging
+about what's missing. If the MCP server is unreachable, callers log a warning and
+continue without enforcement rather than halting.
+
 ## Design Philosophy
 
 **Enforcement over trust.** Agents forget rules. Prompts drift. Hooks get skipped. The only thing
@@ -163,6 +170,6 @@ that works reliably is automated gates that run every time.
 **Explicit over implicit.** The Nine Standards are embedded as hash-verified constants. You can't
 accidentally change the rules — the hash will tell you they changed.
 
-**Graceful degradation.** Missing gitleaks? Secrets check skips. No mypy? Type check skips. Every
-tool degrades to `"skipped"` instead of crashing — you get the checks you can, with clear
-messaging about what's missing.
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.

@@ -16,6 +16,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from ocd.standards_data import PROTECTED_FILES
+
 # ── Helpers ──────────────────────────────────────────────────────────────────────
 
 
@@ -353,6 +355,13 @@ def check_defense_in_depth(root: Path) -> dict[str, Any]:
         ok.append("pre-commit hooks present")
     else:
         evidence.append("no .pre-commit-config.yaml — no automated hook enforcement")
+
+    # Protected instruction files
+    for pf in PROTECTED_FILES:
+        if (root / pf).exists():
+            ok.append(f"{pf} present")
+        else:
+            evidence.append(f"{pf} is missing — protected instruction file must not be deleted")
 
     status = "warn" if evidence else "pass"
     return {

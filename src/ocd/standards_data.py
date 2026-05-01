@@ -144,6 +144,12 @@ AI_ATTRIBUTION_PATTERNS: list[str] = [
     r"^\[AI(-generated)?\]",
 ]
 
+# ── Protected Files ───────────────────────────────────────────────────────────
+
+PROTECTED_FILES: list[str] = [
+    "prompt.txt",
+]
+
 # ── Standards Hash Logic (from routing/standards.py) ─────────────────────────
 
 
