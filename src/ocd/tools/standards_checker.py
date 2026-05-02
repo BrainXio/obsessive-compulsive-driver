@@ -738,16 +738,76 @@ _CHECKER_NAMES: frozenset[str] = frozenset(_CHECKERS.keys())
 
 
 class StandardsChecker:
-    """Run all Nine Standards checkers and aggregate results."""
+    """Run all Nine Standards checkers and aggregate results.
+
+    Caches file contents and parsed ASTs to avoid redundant I/O and parsing
+    across the 9 standard checks.
+    """
 
     def __init__(self, root: Path | None = None):
         self.root = root or Path.cwd()
+        # Cache: path -> (content, ast_or_none)
+        self._file_cache: dict[Path, tuple[str, ast.Module | None]] = {}
+        # Pre-load all Python files
+        self._py_files: list[Path] = []
+        self._md_files: list[Path] = []
+        self._config_files: list[Path] = []
+        self._preload_files()
+
+    def _preload_files(self) -> None:
+        """Discover and cache all source files upfront."""
+        self._py_files = _find_python_files(self.root)
+        self._md_files = _find_markdown_files(self.root)
+        self._config_files = _find_config_files(self.root)
+        # Read and parse all Python files
+        for fpath in self._py_files:
+            content = _read_file(fpath)
+            if content is not None:
+                try:
+                    tree = ast.parse(content)
+                except SyntaxError:
+                    tree = None
+                self._file_cache[fpath] = (content, tree)
+
+    def get_cached_content(self, fpath: Path) -> str | None:
+        """Get cached file content, or read from disk if not cached."""
+        if fpath in self._file_cache:
+            return self._file_cache[fpath][0]
+        return _read_file(fpath)
+
+    def get_cached_ast(self, fpath: Path) -> ast.Module | None:
+        """Get cached AST, or parse from disk if not cached."""
+        if fpath in self._file_cache:
+            return self._file_cache[fpath][1]
+        content = _read_file(fpath)
+        if content is None:
+            return None
+        try:
+            return ast.parse(content)
+        except SyntaxError:
+            return None
+
+    def get_cached_python_files(self) -> list[Path]:
+        """Return cached list of Python files."""
+        return self._py_files
+
+    def get_cached_markdown_files(self) -> list[Path]:
+        """Return cached list of Markdown files."""
+        return self._md_files
+
+    def get_cached_config_files(self) -> list[Path]:
+        """Return cached list of config files."""
+        return self._config_files
 
     def run_all(self) -> dict[str, Any]:
         results = []
         for name in sorted(_CHECKERS):
             fn = _CHECKERS[name]
             try:
+                r = fn(self.root, checker=self)  # type: ignore[call-arg]
+                results.append(r)
+            except TypeError:
+                # Fallback for checkers that don't accept checker param
                 r = fn(self.root)
                 results.append(r)
             except Exception as exc:
@@ -771,6 +831,9 @@ class StandardsChecker:
                 ],
             }
         try:
+            return fn(self.root, checker=self)  # type: ignore[call-arg]
+        except TypeError:
+            # Fallback for checkers that don't accept checker param
             return fn(self.root)
         except Exception as exc:
             return {
