@@ -26,9 +26,11 @@ from ocd.standards_data import (
     verify_standards_hash,
 )
 from ocd.task_enforcer.validation import validate_task_update
+from ocd.tools.runner import ToolRunner, ci_gate_tools, fast_gate_tools
 from ocd.tools.standards_checker import _CHECKER_NAMES, StandardsChecker
 
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+
 
 mcp = FastMCP(
     "ocd",
@@ -215,6 +217,9 @@ async def ocd_check() -> str:
     Target: < 10 seconds for typical use.
     """
     root = _find_project_root()
+    runner = ToolRunner(root)
+    for tool in fast_gate_tools(root):
+        runner.register(tool)
     results: list[dict[str, Any]] = []
 
     # Branch protection
@@ -269,33 +274,10 @@ async def ocd_check() -> str:
             }
         )
 
-    # Secret scan (staged)
-    if _tool_available("gitleaks"):
-        gitleaks_config = root / ".gitleaks.toml"
-        config_args = ["-c", str(gitleaks_config)] if gitleaks_config.exists() else []
-        ok, output = _run_tool(
-            ["gitleaks", "protect", "--staged", *config_args], timeout=30, cwd=root
-        )
-        if ok:
-            results.append(
-                {"check": "secret-scan", "status": "pass", "detail": "no secrets detected"}
-            )
-        else:
-            results.append({"check": "secret-scan", "status": "fail", "detail": output})
-    else:
-        results.append(
-            {"check": "secret-scan", "status": "skip", "detail": "gitleaks not installed"}
-        )
-
-    # Ruff check
-    if _tool_available("ruff"):
-        ok, output = _run_tool(["ruff", "check", "src/", "tests/"], timeout=30, cwd=root)
-        if ok:
-            results.append({"check": "ruff-check", "status": "pass", "detail": "clean"})
-        else:
-            results.append({"check": "ruff-check", "status": "fail", "detail": output})
-    else:
-        results.append({"check": "ruff-check", "status": "skip", "detail": "ruff not installed"})
+    # Tool-based checks via ToolRunner
+    tool_results = runner.run_all()
+    for tr in tool_results:
+        results.append({"check": tr.check, "status": tr.status, "detail": tr.detail})
 
     # Precedent checks
     prec_result = check_precedents(scope="local", root=root)
@@ -339,6 +321,9 @@ async def ocd_ci_check(fast: bool = False) -> str:
         fast: If True, skip full test suite (diff-aware only).
     """
     root = _find_project_root()
+    runner = ToolRunner(root)
+    for tool in ci_gate_tools(root):
+        runner.register(tool)
     results: list[dict[str, Any]] = []
 
     # Standards verify
@@ -351,90 +336,17 @@ async def ocd_ci_check(fast: bool = False) -> str:
         }
     )
 
-    # Secret scan (full)
-    if _tool_available("gitleaks"):
-        gitleaks_config = root / ".gitleaks.toml"
-        config_args = ["-c", str(gitleaks_config)] if gitleaks_config.exists() else []
-        ok, output = _run_tool(
-            ["gitleaks", "detect", "--source", ".", *config_args], timeout=60, cwd=root
-        )
-        results.append(
-            {
-                "check": "secret-scan",
-                "status": "pass" if ok else "fail",
-                "detail": "no secrets detected" if ok else output,
-            }
-        )
-    else:
-        results.append(
-            {"check": "secret-scan", "status": "skip", "detail": "gitleaks not installed"}
-        )
+    # Tool-based checks via ToolRunner
+    tool_results = runner.run_all()
+    for tr in tool_results:
+        results.append({"check": tr.check, "status": tr.status, "detail": tr.detail})
 
-    # Ruff check
-    if _tool_available("ruff"):
-        ok, output = _run_tool(["ruff", "check", "src/", "tests/"], timeout=30, cwd=root)
-        results.append(
-            {
-                "check": "ruff-check",
-                "status": "pass" if ok else "fail",
-                "detail": "clean" if ok else output,
-            }
-        )
-    else:
-        results.append({"check": "ruff-check", "status": "skip", "detail": "ruff not installed"})
-
-    # Ruff format check
-    if _tool_available("ruff"):
-        ok, output = _run_tool(
-            ["ruff", "format", "--check", "src/", "tests/"], timeout=30, cwd=root
-        )
-        results.append(
-            {
-                "check": "ruff-format",
-                "status": "pass" if ok else "fail",
-                "detail": "clean" if ok else output,
-            }
-        )
-    else:
-        results.append({"check": "ruff-format", "status": "skip", "detail": "ruff not installed"})
-
-    # Mypy
-    if _tool_available("mypy"):
-        ok, output = _run_tool(["mypy", "src/ocd/", "--strict"], timeout=60, cwd=root)
-        results.append(
-            {
-                "check": "mypy",
-                "status": "pass" if ok else "fail",
-                "detail": "clean" if ok else output,
-            }
-        )
-    else:
-        results.append({"check": "mypy", "status": "skip", "detail": "mypy not installed"})
-
-    # Yamllint
-    if _tool_available("yamllint"):
-        ok, output = _run_tool(
-            ["yamllint", "-f", "parsable", ".github/workflows/", ".yamllint"],
-            timeout=15,
-            cwd=root,
-        )
-        results.append(
-            {
-                "check": "yamllint",
-                "status": "pass" if ok else "fail",
-                "detail": "clean" if ok else output,
-            }
-        )
-    else:
-        results.append({"check": "yamllint", "status": "skip", "detail": "yamllint not installed"})
-
-    # Pytest
+    # Pytest (not in ci_gate_tools since it needs the fast flag)
     if _tool_available("pytest"):
-        if fast:
-            cmd = [sys.executable, "-m", "pytest", "-q"]
-        else:
-            cmd = [sys.executable, "-m", "pytest", "-v"]
-        ok, output = _run_tool(cmd, timeout=120, cwd=root)
+        pytest_args = ["-q"] if fast else ["-v"]
+        ok, output = _run_tool(
+            [sys.executable, "-m", "pytest", *pytest_args], timeout=120, cwd=root
+        )
         results.append(
             {
                 "check": "pytest",
@@ -1072,6 +984,10 @@ async def ocd_task_claim(task_id: str = "") -> str:
     """
     root = _find_project_root()
     data = _load_tasks_json(root)
+
+    if not data:
+        return json.dumps({"ok": False, "detail": "tasks.json not found"})
+
     pending = data.get("pending", [])
 
     if not pending:
