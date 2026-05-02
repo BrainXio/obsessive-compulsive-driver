@@ -19,6 +19,13 @@ REPO_NAMES = (
     "obsessive-compulsive-driver",
 )
 
+_REPO_TO_CENTRALIZED: dict[str, str] = {
+    "another-intelligence": "ai",
+    "attention-deficit-hyperactivity-driver": "adhd",
+    "autism-spectrum-driver": "asd",
+    "obsessive-compulsive-driver": "ocd",
+}
+
 
 @dataclass
 class DependencyIssue:
@@ -49,6 +56,20 @@ def _find_repos_root(project_root: Path) -> Path:
     return project_root.parent
 
 
+def _resolve_tasks_path(repo_name: str) -> Path | None:
+    """Return the effective tasks.json path for *repo_name*.
+
+    BrainXio repos use centralized task files under ~/.brainxio/ocd/tasks/.
+    Falls back to repo-local tasks.json when no centralized mapping exists.
+    """
+    short = _REPO_TO_CENTRALIZED.get(repo_name)
+    if short:
+        centralized = Path.home() / ".brainxio" / "ocd" / "tasks" / f"{short}.json"
+        if centralized.exists():
+            return centralized
+    return None
+
+
 def load_all_registries(project_root: Path) -> dict[str, dict[str, Any]]:
     """Load tasks.json from all available BrainXio repos.
 
@@ -58,6 +79,12 @@ def load_all_registries(project_root: Path) -> dict[str, dict[str, Any]]:
     repos_root = _find_repos_root(project_root)
     registries: dict[str, dict[str, Any]] = {}
     for repo_name in REPO_NAMES:
+        # Prefer centralized task file
+        cpath = _resolve_tasks_path(repo_name)
+        if cpath and cpath.exists():
+            registries[repo_name] = json.loads(cpath.read_text())
+            continue
+        # Fallback to repo-local tasks.json
         path = repos_root / repo_name / "tasks.json"
         if path.exists():
             registries[repo_name] = json.loads(path.read_text())

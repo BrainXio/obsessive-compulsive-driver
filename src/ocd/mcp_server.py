@@ -51,6 +51,28 @@ def _find_project_root() -> Path:
     return cwd
 
 
+_REPO_TO_CENTRALIZED: dict[str, str] = {
+    "another-intelligence": "ai",
+    "attention-deficit-hyperactivity-driver": "adhd",
+    "autism-spectrum-driver": "asd",
+    "obsessive-compulsive-driver": "ocd",
+}
+
+
+def _resolve_tasks_path(root: Path) -> Path:
+    """Return the effective tasks.json path for *root*.
+
+    BrainXio repos use centralized task files under ~/.brainxio/ocd/tasks/.
+    Falls back to repo-local tasks.json when no centralized mapping exists.
+    """
+    short = _REPO_TO_CENTRALIZED.get(root.name)
+    if short:
+        centralized = Path.home() / ".brainxio" / "ocd" / "tasks" / f"{short}.json"
+        if centralized.exists():
+            return centralized
+    return root / "tasks.json"
+
+
 def _rel(root: Path, path: Path) -> str:
     try:
         return str(path.relative_to(root))
@@ -805,8 +827,8 @@ async def ocd_validate_ppac_consistency() -> str:
 
 
 def _load_tasks_json(root: Path) -> dict[str, Any]:
-    """Load tasks.json from the project root."""
-    path = root / "tasks.json"
+    """Load tasks.json from the resolved path."""
+    path = _resolve_tasks_path(root)
     if not path.exists():
         return {}
     try:
@@ -895,7 +917,7 @@ async def ocd_task_update(task_id: str, updates: dict[str, Any]) -> str:
         updates: Dict of field names to new values (e.g., {'kanban_status': 'in_progress'}).
     """
     root = _find_project_root()
-    path = root / "tasks.json"
+    path = _resolve_tasks_path(root)
 
     validation = validate_task_update(task_id, updates)
     if not validation.is_valid:
@@ -1077,7 +1099,7 @@ async def ocd_task_claim(task_id: str = "") -> str:
 
     selected["kanban_status"] = "in_progress"
 
-    path = root / "tasks.json"
+    path = _resolve_tasks_path(root)
     path.write_text(json.dumps(data, indent=2) + "\n")
 
     claim_msg = {

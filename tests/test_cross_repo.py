@@ -8,6 +8,7 @@ from unittest import mock
 
 from ocd.task_enforcer.cross_repo import (
     REPO_NAMES,
+    _resolve_tasks_path,
     get_task_repo,
     load_all_registries,
     resolve_task,
@@ -158,9 +159,15 @@ class TestLoadAllRegistries:
                 meta={"repository": repo_name},
             )
 
-        with mock.patch(
-            "ocd.task_enforcer.cross_repo._find_repos_root",
-            return_value=tmp_path,
+        with (
+            mock.patch(
+                "ocd.task_enforcer.cross_repo._find_repos_root",
+                return_value=tmp_path,
+            ),
+            mock.patch(
+                "ocd.task_enforcer.cross_repo._resolve_tasks_path",
+                return_value=None,
+            ),
         ):
             registries = load_all_registries(tmp_path / "obsessive-compulsive-driver")
 
@@ -174,11 +181,73 @@ class TestLoadAllRegistries:
             [{"id": "ocd-1", "subject": "only"}],
         )
 
-        with mock.patch(
-            "ocd.task_enforcer.cross_repo._find_repos_root",
-            return_value=tmp_path,
+        with (
+            mock.patch(
+                "ocd.task_enforcer.cross_repo._find_repos_root",
+                return_value=tmp_path,
+            ),
+            mock.patch(
+                "ocd.task_enforcer.cross_repo._resolve_tasks_path",
+                return_value=None,
+            ),
         ):
             registries = load_all_registries(tmp_path / "obsessive-compulsive-driver")
 
         assert "obsessive-compulsive-driver" in registries
         assert len(registries) == 1
+
+    def test_prefers_centralized_over_local(self, tmp_path: Path) -> None:
+        """Centralized task file takes precedence over repo-local tasks.json."""
+        _write_tasks_json(
+            tmp_path / "obsessive-compulsive-driver" / "tasks.json",
+            [{"id": "ocd-local", "subject": "local only"}],
+        )
+        centralized_dir = tmp_path / "centralized"
+        centralized_dir.mkdir()
+        (centralized_dir / "ocd.json").write_text(
+            json.dumps({"pending": [{"id": "ocd-central", "subject": "central"}]})
+        )
+
+        def fake_resolve(repo_name: str) -> Path | None:
+            if repo_name == "obsessive-compulsive-driver":
+                return centralized_dir / "ocd.json"
+            return None
+
+        with (
+            mock.patch(
+                "ocd.task_enforcer.cross_repo._find_repos_root",
+                return_value=tmp_path,
+            ),
+            mock.patch(
+                "ocd.task_enforcer.cross_repo._resolve_tasks_path",
+                side_effect=fake_resolve,
+            ),
+        ):
+            registries = load_all_registries(tmp_path / "obsessive-compulsive-driver")
+
+        assert "obsessive-compulsive-driver" in registries
+        tasks = registries["obsessive-compulsive-driver"]["pending"]
+        assert tasks[0]["id"] == "ocd-central"
+
+
+class TestResolveTasksPath:
+    def test_returns_path_for_known_repo(self, tmp_path: Path) -> None:
+        tasks_dir = tmp_path / ".brainxio" / "ocd" / "tasks"
+        tasks_dir.mkdir(parents=True)
+        (tasks_dir / "ocd.json").write_text("{}")
+
+        with mock.patch("ocd.task_enforcer.cross_repo.Path.home", return_value=tmp_path):
+            result = _resolve_tasks_path("obsessive-compulsive-driver")
+
+        assert result is not None
+        assert result.name == "ocd.json"
+
+    def test_returns_none_for_unknown_repo(self) -> None:
+        result = _resolve_tasks_path("unknown-repo")
+        assert result is None
+
+    def test_returns_none_when_file_missing(self, tmp_path: Path) -> None:
+        with mock.patch("ocd.task_enforcer.cross_repo.Path.home", return_value=tmp_path):
+            result = _resolve_tasks_path("obsessive-compulsive-driver")
+
+        assert result is None
